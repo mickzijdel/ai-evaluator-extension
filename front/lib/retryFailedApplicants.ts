@@ -9,6 +9,8 @@ import { type FailedApplicant, removeFailedApplicants } from './failedApplicants
 import type { Preset } from './preset';
 import { Logger } from './logger';
 import { formatProcessingRate } from '../frontend/MainPage';
+import { createEvaluationRecords } from './evaluation/airtableWriter';
+import { getSelectedModelProvider, getOpenAiModelName, getAnthropicModelName } from './getChatCompletion/apiKeyManager';
 
 /**
  * Retry failed applicants by fetching their records and re-processing
@@ -100,8 +102,50 @@ export const retryFailedApplicants = async (
           ),
         ]);
 
-        // Save to Airtable
-        await pRetry(() => evaluationTable.createRecordAsync(evaluation));
+        // Capture provider and model info for tracking
+        const provider = getSelectedModelProvider();
+        const modelId = provider === 'openai' ? getOpenAiModelName() : getAnthropicModelName();
+
+        // Extract results and logs from evaluation
+        const results: Record<string, number | string> = {};
+        const logsByField: Record<string, string> = {};
+
+        for (const [key, value] of Object.entries(evaluation)) {
+          if (typeof value === 'number' || (typeof value === 'string' && !key.startsWith('_'))) {
+            results[key] = value;
+          } else if (typeof value === 'string' && key.startsWith('_')) {
+            // Log fields
+            logsByField[key] = value;
+          }
+        }
+
+        // Save to Airtable using centralized writer
+        await pRetry(() =>
+          createEvaluationRecords(
+            evaluationTable,
+            record,
+            preset.evaluationApplicantField,
+            preset.evaluationLogsField,
+            preset.linkedinDataField,
+            preset.pdfResumeDataField,
+            preset.multiAxisDataField,
+            // Individual axis fields
+            preset.generalPromiseField,
+            preset.mlSkillsField,
+            preset.softwareEngineeringField,
+            preset.policyExperienceField,
+            preset.aiSafetyUnderstandingField,
+            preset.pathToImpactField,
+            preset.researchExperienceField,
+            // Provider/Model tracking
+            preset.providerModelFieldId,
+            preset.providerModelTemplate,
+            provider,
+            modelId,
+            results,
+            logsByField
+          )
+        );
 
         const totalTime = Date.now() - applicantStartTime;
         Logger.info(`✅ Successfully retried applicant ${record.id} in ${totalTime}ms`);

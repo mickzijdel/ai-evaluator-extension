@@ -1,6 +1,9 @@
-import type { Record as AirtableRecord, Table } from '@airtable/blocks/models';
+import type { Record as AirtableRecord, Table, Field } from '@airtable/blocks/models';
+import { FieldType } from '@airtable/blocks/models';
+import type { ModelProvider } from '../models/config';
 import { Logger } from '../logger';
 import { extractLinkedinData, extractEnrichmentLogs, extractPdfResumeData, extractMultiAxisData } from './extractors';
+import { formatProviderModel } from './providerModelFormatter';
 
 /**
  * Extracts applicant name from record for display purposes
@@ -69,10 +72,22 @@ export async function createEvaluationRecords(
   aiSafetyUnderstandingFieldId: string | undefined,
   pathToImpactFieldId: string | undefined,
   researchExperienceFieldId: string | undefined,
+  // Provider/Model tracking
+  providerModelFieldId: string | undefined,
+  providerModelTemplate: string | undefined,
+  provider: ModelProvider,
+  modelId: string,
   results: Record<string, number | string>,
   logsByField: Record<string, string>
 ): Promise<void> {
+  Logger.info("🚀 createEvaluationRecords START for:", applicantRecord.id);
   Logger.info("📝 Creating evaluation record for applicant:", applicantRecord.name || applicantRecord.id);
+  Logger.info("🔍 Provider/Model params:", {
+    providerModelFieldId,
+    providerModelTemplate,
+    provider,
+    modelId
+  });
   Logger.debug("📝 logsByField structure:", {
     fieldCount: Object.keys(logsByField).length,
     fieldIds: Object.keys(logsByField),
@@ -399,6 +414,119 @@ export async function createEvaluationRecords(
   } catch (e) {
     Logger.info('🔎 Error logging enrichment field snippets', e);
   }
+
+  // Add provider/model tracking if configured
+  if (providerModelFieldId) {
+    Logger.info('🤖 Provider/Model tracking field configured:', providerModelFieldId);
+    Logger.info('🤖 Provider:', provider, 'Model:', modelId);
+    Logger.info('🤖 Template:', providerModelTemplate);
+
+    try {
+      const field = evaluationTable.getFieldByIdIfExists(providerModelFieldId);
+      if (!field) {
+        Logger.error('⚠️ Provider/Model field ID not found in evaluation table:', providerModelFieldId);
+      } else {
+        Logger.info('🤖 Field found, type:', field.type, 'name:', field.name);
+
+        // Format the value using the template
+        const template = providerModelTemplate || '{provider} {model}';
+        const formattedValue = formatProviderModel(provider, modelId, template);
+        Logger.info('🤖 Formatted provider/model value:', formattedValue);
+
+        // Check field type and handle accordingly
+        if (field.type === FieldType.SINGLE_SELECT) {
+          Logger.info('🤖 Field is SINGLE_SELECT');
+
+          // Check if option exists
+          const selectField = field as any; // Cast to access select-specific properties
+          const choices = selectField.options?.choices || [];
+          Logger.info('🤖 Current choices:', choices.map((c: any) => c.name));
+
+          const existingOption = choices.find(
+            (choice: any) => choice.name === formattedValue
+          );
+
+          if (!existingOption) {
+            Logger.warn('🤖 Option does not exist, need to create:', formattedValue);
+
+            // Update field to add the new option
+            try {
+              const newChoices = [
+                ...choices,
+                { name: formattedValue }
+              ];
+
+              Logger.info('🤖 Updating field with new choices...');
+              await field.updateOptionsAsync({
+                choices: newChoices
+              });
+              Logger.info('🤖 Field options updated successfully');
+            } catch (updateError) {
+              Logger.error('❌ Failed to update field options:', updateError);
+              // Continue anyway - maybe the option was added by another process
+            }
+          } else {
+            Logger.info('🤖 Option already exists');
+          }
+
+          recordData[providerModelFieldId] = { name: formattedValue };
+          Logger.info('🤖 Set single-select value in recordData');
+        } else if (field.type === FieldType.MULTIPLE_SELECTS) {
+          Logger.info('🤖 Field is MULTIPLE_SELECTS');
+
+          // Check if option exists
+          const selectField = field as any;
+          const choices = selectField.options?.choices || [];
+          Logger.info('🤖 Current choices:', choices.map((c: any) => c.name));
+
+          const existingOption = choices.find(
+            (choice: any) => choice.name === formattedValue
+          );
+
+          if (!existingOption) {
+            Logger.warn('🤖 Option does not exist, need to create:', formattedValue);
+
+            // Update field to add the new option
+            try {
+              const newChoices = [
+                ...choices,
+                { name: formattedValue }
+              ];
+
+              Logger.info('🤖 Updating field with new choices...');
+              await field.updateOptionsAsync({
+                choices: newChoices
+              });
+              Logger.info('🤖 Field options updated successfully');
+            } catch (updateError) {
+              Logger.error('❌ Failed to update field options:', updateError);
+              // Continue anyway - maybe the option was added by another process
+            }
+          } else {
+            Logger.info('🤖 Option already exists');
+          }
+
+          recordData[providerModelFieldId] = [{ name: formattedValue }];
+          Logger.info('🤖 Set multi-select value in recordData');
+        } else {
+          Logger.info('⚠️ Provider/Model field is not a select field type (type:', field.type, '), writing as string');
+          recordData[providerModelFieldId] = formattedValue;
+        }
+
+        Logger.info('🤖 Provider/Model tracking value set in recordData');
+      }
+    } catch (error) {
+      Logger.error('❌ Error setting provider/model tracking:', error);
+      // Log the full error object for debugging
+      if (error instanceof Error) {
+        Logger.error('❌ Error message:', error.message);
+        Logger.error('❌ Error stack:', error.stack);
+      }
+    }
+  } else {
+    Logger.debug('🤖 No provider/model field configured');
+  }
+
   // Create the record
   await evaluationTable.createRecordAsync(recordData);
 }

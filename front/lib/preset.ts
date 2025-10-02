@@ -40,6 +40,10 @@ export type Preset = {
   aiSafetyUnderstandingField?: string; // Field ID to store Understanding of AI Safety axis score
   pathToImpactField?: string; // Field ID to store Path to Impact axis score
   researchExperienceField?: string; // Field ID to store Research Experience axis score
+
+  // Provider/Model tracking options
+  providerModelFieldId?: string; // Field ID to store provider/model info
+  providerModelTemplate?: string; // Template string with {provider} and {model} placeholders
 };
 
 export const defaultPreset: Preset = {
@@ -75,7 +79,11 @@ export const defaultPreset: Preset = {
   policyExperienceField: undefined,
   aiSafetyUnderstandingField: undefined,
   pathToImpactField: undefined,
-  researchExperienceField: undefined
+  researchExperienceField: undefined,
+
+  // Provider/Model tracking options (undefined by default)
+  providerModelFieldId: undefined,
+  providerModelTemplate: '{provider} {model}' // Default template
 };
 
 export const upsertPreset = async (

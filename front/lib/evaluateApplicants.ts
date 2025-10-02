@@ -1,9 +1,11 @@
 import type { Record as AirtableRecord, Table } from '@airtable/blocks/models';
+import { globalConfig } from '@airtable/blocks';
 import { Logger } from './logger';
 import pRetry from 'p-retry';
 import { getChatCompletion } from './getChatCompletion';
 import { isServerModeEnabled, evaluateApplicantWithServer, resetServerFallbackPrompt } from './getChatCompletion/server';
 import { createEvaluationRecords } from './evaluation/airtableWriter';
+import { getSelectedModelProvider, getOpenAiModelName, getAnthropicModelName } from './getChatCompletion/apiKeyManager';
 
 import type { Preset } from './preset';
 import {
@@ -267,6 +269,10 @@ export async function processBatch(
         // Set applicant name in evaluation record
         setApplicantNameInResult(result, applicantRecord, evaluationTable);
 
+        // Capture provider and model info for tracking
+        const provider = getSelectedModelProvider();
+        const modelId = provider === 'openai' ? getOpenAiModelName() : getAnthropicModelName();
+
         // Create evaluation record
         await createEvaluationRecords(
           evaluationTable,
@@ -284,6 +290,11 @@ export async function processBatch(
           preset.aiSafetyUnderstandingField,
           preset.pathToImpactField,
           preset.researchExperienceField,
+          // Provider/Model tracking
+          preset.providerModelFieldId,
+          preset.providerModelTemplate,
+          provider,
+          modelId,
           result,
           {} // No logs for this fast path
         );
@@ -384,6 +395,10 @@ export async function processBatch(
         }
       }
 
+      // Capture provider and model info for tracking
+      const provider = getSelectedModelProvider();
+      const modelId = provider === 'openai' ? getOpenAiModelName() : getAnthropicModelName();
+
       // Create evaluation record
       await createEvaluationRecords(
         evaluationTable,
@@ -401,6 +416,11 @@ export async function processBatch(
         preset.aiSafetyUnderstandingField,
         preset.pathToImpactField,
         preset.researchExperienceField,
+        // Provider/Model tracking
+        preset.providerModelFieldId,
+        preset.providerModelTemplate,
+        provider,
+        modelId,
         result,
         logsByField
       );
@@ -564,10 +584,75 @@ export const evaluateApplicants = (
       }
       // Set the applicant link
       result[preset.evaluationApplicantField] = [{ id: applicant.id }];
-      
+
       // Set applicant name in evaluation record
       setApplicantNameInResult(result, applicant, evaluationTable);
-      
+
+      // Add provider/model tracking if configured
+      if (preset.providerModelFieldId && evaluationTable) {
+        try {
+          const provider = getSelectedModelProvider();
+          const modelId = provider === 'openai' ? getOpenAiModelName() : getAnthropicModelName();
+
+          const { formatProviderModel } = await import('./evaluation/providerModelFormatter');
+          const { FieldType } = await import('@airtable/blocks/models');
+
+          const template = preset.providerModelTemplate || '{provider} {model}';
+          const formattedValue = formatProviderModel(provider, modelId, template);
+
+          Logger.info('🤖 [Compat] Adding provider/model tracking:', formattedValue);
+
+          const field = evaluationTable.getFieldByIdIfExists(preset.providerModelFieldId);
+          if (field) {
+            // Check if it's a select field
+            if (field.type === FieldType.SINGLE_SELECT) {
+              const selectField = field as any;
+              const choices = selectField.options?.choices || [];
+              const existingOption = choices.find((c: any) => c.name === formattedValue);
+
+              if (!existingOption) {
+                Logger.info('🤖 [Compat] Creating new single-select option:', formattedValue);
+                try {
+                  await field.updateOptionsAsync({
+                    choices: [...choices, { name: formattedValue }]
+                  });
+                } catch (updateError) {
+                  Logger.warn('🤖 [Compat] Failed to create option, may already exist:', updateError);
+                }
+              }
+
+              result[preset.providerModelFieldId] = { name: formattedValue };
+            } else if (field.type === FieldType.MULTIPLE_SELECTS) {
+              const selectField = field as any;
+              const choices = selectField.options?.choices || [];
+              const existingOption = choices.find((c: any) => c.name === formattedValue);
+
+              if (!existingOption) {
+                Logger.info('🤖 [Compat] Creating new multi-select option:', formattedValue);
+                try {
+                  await field.updateOptionsAsync({
+                    choices: [...choices, { name: formattedValue }]
+                  });
+                } catch (updateError) {
+                  Logger.warn('🤖 [Compat] Failed to create option, may already exist:', updateError);
+                }
+              }
+
+              result[preset.providerModelFieldId] = [{ name: formattedValue }];
+            } else {
+              // Text field
+              result[preset.providerModelFieldId] = formattedValue;
+            }
+
+            Logger.info('🤖 [Compat] Provider/model field added to result');
+          } else {
+            Logger.warn('🤖 [Compat] Provider/model field not found:', preset.providerModelFieldId);
+          }
+        } catch (error) {
+          Logger.error('🤖 [Compat] Error adding provider/model tracking:', error);
+        }
+      }
+
       return result;
     } catch (error) {
       Logger.error(`Error processing applicant ${applicant.id}:`, error);

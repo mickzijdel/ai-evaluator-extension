@@ -1078,7 +1078,59 @@ export const MainPage = () => {
               shouldAllowPickingNone={true}
             />
           </FormFieldWithTooltip>
-          
+
+          {/* Provider/Model Tracking */}
+          <div className="mt-4 mb-2 p-2 bg-gray-50 rounded">
+            <div className="font-bold mb-2">Provider/Model Tracking</div>
+            <p className="text-sm text-gray-600 mb-3">
+              Track which AI provider and model was used for each evaluation.
+            </p>
+
+            <FormFieldWithTooltip
+              label="(optional) Provider/Model Field"
+              helpKey="providerModelField"
+              showGuidedHelp={showGuidedHelp}
+            >
+              <FieldPickerSynced
+                table={evaluationTable}
+                allowedTypes={[
+                  FieldType.SINGLE_SELECT,
+                  FieldType.MULTIPLE_SELECTS,
+                  FieldType.SINGLE_LINE_TEXT,
+                  FieldType.MULTILINE_TEXT,
+                ]}
+                globalConfigKey={['presets', preset.name, 'providerModelFieldId']}
+                shouldAllowPickingNone={true}
+              />
+            </FormFieldWithTooltip>
+
+            {preset.providerModelFieldId && (
+              <FormFieldWithTooltip
+                label="Template"
+                helpKey="providerModelTemplate"
+                showGuidedHelp={showGuidedHelp}
+              >
+                <Input
+                  value={preset.providerModelTemplate || '{provider} {model}'}
+                  onChange={(e) => {
+                    upsertPreset({
+                      ...preset,
+                      providerModelTemplate: e.target.value || '{provider} {model}',
+                    });
+                  }}
+                  placeholder="{provider} {model}"
+                />
+                <div className="mt-1 text-xs text-gray-500">
+                  <div className="font-medium mb-1">Available placeholders:</div>
+                  <div>• <code>{'{provider}'}</code> → Provider name (OpenAI, Anthropic Claude)</div>
+                  <div>• <code>{'{model}'}</code> → Model name (GPT-5 mini, Claude Sonnet 4)</div>
+                  <div>• <code>{'{provider_emoji}'}</code> → Provider emoji (🤖, 🧠)</div>
+                  <div className="mt-1">Example: "AI ({'{provider}'} {'{model}'})" → "AI (OpenAI GPT-5 mini)"</div>
+                </div>
+              </FormFieldWithTooltip>
+            )}
+          </div>
+
           {/* Server-specific features section */}
           {isServerModeEnabled() && (
             <>
