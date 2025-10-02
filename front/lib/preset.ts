@@ -6,7 +6,7 @@ export type Preset = {
 
   applicantTableId: string;
   applicantViewId: string;
-  applicantFields: { fieldId: string; questionName?: string }[];
+  applicantFields: { fieldId: string; questionName?: string; excludeFromLogs?: boolean }[];
 
   evaluationTableId: string;
   evaluationFields: {

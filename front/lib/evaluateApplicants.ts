@@ -497,7 +497,7 @@ export const evaluateApplicants = (
           const criteria = resolveCriteria(evaluationField, evaluationTable);
 
       const evalResult = await evaluateItem(
-            stringifyApplicantForLLM(plainRecord),
+            stringifyApplicantForLLM(plainRecord, preset),
             criteria,
             fieldId,
             applicantId,
@@ -649,11 +649,27 @@ const convertToPlainRecord = (
  * Format applicant data for LLM processing
  *
  * @param applicant Record containing applicant data
+ * @param preset Optional preset to check for excludeFromLogs fields
  * @returns Formatted string for LLM input
  */
-const stringifyApplicantForLLM = (applicant: Record<string, string>): string => {
+const stringifyApplicantForLLM = (applicant: Record<string, string>, preset?: Preset): string => {
+  // Build a set of excluded keys (both fieldId and questionName)
+  const excludedKeys = new Set<string>();
+  if (preset) {
+    for (const field of preset.applicantFields) {
+      if (field.excludeFromLogs) {
+        excludedKeys.add(field.fieldId);
+        if (field.questionName) {
+          excludedKeys.add(field.questionName);
+        }
+      }
+    }
+  }
+
   return Object.entries(applicant)
     .filter(([, value]) => value)
+    // Filter out excluded fields
+    .filter(([key]) => !excludedKeys.has(key))
     // TODO: This is a quick fix to filter out duplicate field IDs. The proper solution would be
     // to refactor convertToPlainRecord to avoid storing both field IDs and questionNames,
     // while maintaining a separate lookup mechanism for field IDs when needed for dependencies
@@ -688,7 +704,7 @@ const evaluateApplicant = async (
 ): Promise<Record<string, number | string>> => {
   const logsByField = {};
   const skippedFields = {};
-  const applicantString = stringifyApplicantForLLM(applicant);
+  const applicantString = stringifyApplicantForLLM(applicant, preset);
   
   // Get LinkedIn URL if enrichment is enabled
   let linkedinUrl: string | undefined;

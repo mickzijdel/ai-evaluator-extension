@@ -67,6 +67,19 @@ export const HELP_CONTENT: Record<string, HelpContent> = {
     consequences:
       'The AI will see this name instead of the original field name, affecting how it interprets the content',
   },
+  excludeFromLogs: {
+    purpose: 'Prevent large field data from being saved in the Notes/Logs field to avoid size limits',
+    setup:
+      "Enable this for fields with large content (like LinkedIn profiles or PDF resumes) that you don't need in the logs.",
+    examples: ['LinkedIn Profile Data', 'Resume Text', 'Cover Letter'],
+    bestPractices: [
+      'Use for enrichment fields that contain large amounts of data',
+      'The field data is still sent to the AI for evaluation, just not saved to logs',
+      'Helps prevent exceeding Airtable\'s 100,000 character limit on long text fields',
+    ],
+    consequences:
+      'This field will not appear in the Notes/Logs field, but is still used by the AI for evaluation',
+  },
   evaluationTable: {
     purpose: 'Select where evaluation results and scores will be stored',
     setup:

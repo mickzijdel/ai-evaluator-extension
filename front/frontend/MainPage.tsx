@@ -6,6 +6,7 @@ import {
   Input,
   ProgressBar,
   Select,
+  Switch,
   TablePickerSynced,
   Text,
   ViewPickerSynced,
@@ -1410,6 +1411,9 @@ const ApplicantFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) => 
   const [questionName, setQuestionName] = useState<string>(
     applicantField.questionName ?? ''
   );
+  const [excludeFromLogs, setExcludeFromLogs] = useState<boolean>(
+    applicantField.excludeFromLogs ?? false
+  );
 
   const saveField = (applicantField: Preset['applicantFields'][number]) => {
     // delete
@@ -1475,6 +1479,26 @@ const ApplicantFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) => 
                 questionName: event.target.value || undefined,
               });
             }}
+          />
+        </FormFieldWithTooltip>
+      </div>
+      <div className="mt-3">
+        <FormFieldWithTooltip
+          label="Exclude from logs"
+          helpKey="excludeFromLogs"
+          showGuidedHelp={showGuidedHelp}
+          className="mb-0"
+        >
+          <Switch
+            value={excludeFromLogs}
+            onChange={(value) => {
+              setExcludeFromLogs(value);
+              saveField({
+                ...applicantField,
+                excludeFromLogs: value || undefined,
+              });
+            }}
+            label="Don't include this field's data in the Notes/Logs field (saves space, but data is still sent to LLM)"
           />
         </FormFieldWithTooltip>
       </div>
