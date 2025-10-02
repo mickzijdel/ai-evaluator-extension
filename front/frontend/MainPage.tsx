@@ -189,10 +189,34 @@ export const MainPage = () => {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0); // between 0.0 and 1.0
   const [result, setResult] = useState<string>(null);
+  const [retryStatus, setRetryStatus] = useState<string>(null); // Status message for API retries
   const [failedCount, setFailedCount] = useState(getFailedApplicantsCount());
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+
+  /**
+   * Callback for retry status updates from API calls
+   */
+  const handleRetryStatus = (
+    message: string,
+    remainingSeconds?: number,
+    attemptNumber?: number,
+    maxAttempts?: number
+  ) => {
+    // Clear retry status if message is empty (success after retry)
+    if (!message) {
+      setRetryStatus(null);
+      return;
+    }
+
+    let statusMessage = message;
+    if (attemptNumber !== undefined && maxAttempts !== undefined && attemptNumber > 0) {
+      statusMessage += ` (attempt ${attemptNumber}/${maxAttempts})`;
+    }
+    setRetryStatus(statusMessage);
+  };
+
   /**
    * Process applicants in batches to prevent browser overload
    * Works with the existing LLM API concurrency limits
@@ -785,8 +809,17 @@ export const MainPage = () => {
     setRunning(true);
     setProgress(0);
     setResult(null);
+    setRetryStatus(null); // Clear any previous retry status
     setProcessingStartTime(Date.now());
     Logger.debug('Running preset', preset);
+
+    // Set up retry status callback for API calls
+    import('../lib/getChatCompletion/anthropic').then((module) => {
+      module.setRetryStatusCallback(handleRetryStatus);
+    });
+    import('../lib/getChatCompletion/openai').then((module) => {
+      module.setRetryStatusCallback(handleRetryStatus);
+    });
     
     // Log enrichment configuration details
     Logger.debug("🧩 Current preset enrichment configuration:", {
@@ -813,6 +846,14 @@ export const MainPage = () => {
       const errorMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
       setResult(errorMessage);
     } finally {
+      // Clear retry status callback
+      import('../lib/getChatCompletion/anthropic').then((module) => {
+        module.setRetryStatusCallback(undefined);
+      });
+      import('../lib/getChatCompletion/openai').then((module) => {
+        module.setRetryStatusCallback(undefined);
+      });
+      setRetryStatus(null); // Clear retry status message
       setRunning(false);
       setProcessingStartTime(null);
     }
@@ -824,7 +865,16 @@ export const MainPage = () => {
     setIsRetrying(true);
     setProgress(0);
     setResult(null);
+    setRetryStatus(null); // Clear any previous retry status
     const retryStartTime = Date.now();
+
+    // Set up retry status callback for API calls
+    import('../lib/getChatCompletion/anthropic').then((module) => {
+      module.setRetryStatusCallback(handleRetryStatus);
+    });
+    import('../lib/getChatCompletion/openai').then((module) => {
+      module.setRetryStatusCallback(handleRetryStatus);
+    });
 
     try {
       const failedApplicants = getFailedApplicants();
@@ -854,6 +904,14 @@ export const MainPage = () => {
       const errorMessage = `Retry error: ${error instanceof Error ? error.message : String(error)}`;
       setResult(errorMessage);
     } finally {
+      // Clear retry status callback
+      import('../lib/getChatCompletion/anthropic').then((module) => {
+        module.setRetryStatusCallback(undefined);
+      });
+      import('../lib/getChatCompletion/openai').then((module) => {
+        module.setRetryStatusCallback(undefined);
+      });
+      setRetryStatus(null); // Clear retry status message
       setIsRetrying(false);
     }
   };
@@ -1378,6 +1436,11 @@ export const MainPage = () => {
         )}
       </div>
       {running && <ProgressBar className="my-2" progress={progress} />}
+      {retryStatus && (
+        <div className="my-2 p-2 bg-yellow-100 rounded text-yellow-800">
+          <strong>⏳ {retryStatus}</strong>
+        </div>
+      )}
       {result && <Text className="my-2">{result}</Text>}
 
       <FailedApplicantsModal

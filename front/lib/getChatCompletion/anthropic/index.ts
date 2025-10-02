@@ -3,10 +3,21 @@ import type { GetChatCompletion } from '..';
 import { getCurrentConcurrency } from '../../concurrency/config';
 import { anthropicApiKey, anthropicModel } from './config';
 import { Logger } from '../../logger';
+import { retryWithBackoff, type RetryStatusCallback } from '../../retryWithBackoff';
 
 // Create rate limiter with dynamic concurrency
 let globalRateLimit = pLimit(getCurrentConcurrency());
 let lastConcurrency = getCurrentConcurrency();
+
+// Retry status callback (can be set globally)
+let retryStatusCallback: RetryStatusCallback | undefined;
+
+/**
+ * Set the retry status callback for UI updates
+ */
+export const setRetryStatusCallback = (callback: RetryStatusCallback | undefined) => {
+  retryStatusCallback = callback;
+};
 
 // Function to update rate limiter if concurrency changed
 const updateRateLimit = () => {
@@ -71,29 +82,37 @@ export const getChatCompletion: GetChatCompletion = async (messages) => {
   const lastMessageIsSystem = messages[messages.length - 1]?.role === 'system';
 
   return updateRateLimit()(async () => {
-    try {
-      const apiUrl = 'https://api.anthropic.com/v1/messages';
-      Logger.info(`🌐 DIRECT Anthropic API call to: ${apiUrl}`);
+    // Wrap the API call with retry logic
+    return retryWithBackoff(
+      async () => {
+        try {
+          const apiUrl = 'https://api.anthropic.com/v1/messages';
+          Logger.info(`🌐 DIRECT Anthropic API call to: ${apiUrl}`);
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'x-api-key': anthropicApiKey,
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify(buildRequestBody(messages, lastMessageIsSystem)),
-      });
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'anthropic-version': '2023-06-01',
+              'x-api-key': anthropicApiKey,
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify(buildRequestBody(messages, lastMessageIsSystem)),
+          });
 
-      return await handleApiResponse(response);
-    } catch (error) {
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error(
-          'Failed to connect to Anthropic API. Please check your internet connection and API key.'
-        );
+          return await handleApiResponse(response);
+        } catch (error) {
+          if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+            throw new Error(
+              'Failed to connect to Anthropic API. Please check your internet connection and API key.'
+            );
+          }
+          throw error;
+        }
+      },
+      {
+        onRetryStatus: retryStatusCallback,
       }
-      throw error;
-    }
+    );
   });
 };
