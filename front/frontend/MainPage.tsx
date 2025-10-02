@@ -1499,6 +1499,7 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
   const evaluationField = preset.evaluationFields[index] ?? {
     fieldId: '',
     criteria: '',
+    useFieldDescription: false,
     dependsOnInputField: undefined,
   };
   const isExistingField = index < preset.evaluationFields.length;
@@ -1512,6 +1513,9 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
     evaluationTable.getFieldByIdIfExists(evaluationField.fieldId)
   );
   const [criteria, setCriteria] = useState<string>(evaluationField.criteria ?? '');
+  const [useFieldDescription, setUseFieldDescription] = useState<boolean>(
+    evaluationField.useFieldDescription ?? false
+  );
   // We don't use the dependsOnField value directly, but we need the setter
   const [, setDependsOnField] = useState<Field | null>(
     evaluationField.dependsOnInputField
@@ -1594,6 +1598,37 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
           showGuidedHelp={showGuidedHelp}
           className="mb-0"
         >
+          <div className="mb-2">
+            <div className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                id={`use-field-desc-${index}`}
+                className="mr-2"
+                checked={useFieldDescription}
+                onChange={(e) => {
+                  const newValue = e.target.checked;
+                  setUseFieldDescription(newValue);
+                  saveField({
+                    ...evaluationField,
+                    useFieldDescription: newValue,
+                  });
+                }}
+              />
+              <label htmlFor={`use-field-desc-${index}`} className="text-sm">
+                Use field description as criteria
+              </label>
+            </div>
+            {useFieldDescription && field?.description ? (
+              <div className="p-2 bg-gray-100 rounded text-sm mb-2">
+                <div className="font-medium mb-1">Field description:</div>
+                <div className="text-gray-700">{field.description}</div>
+              </div>
+            ) : useFieldDescription && field && !field.description ? (
+              <div className="p-2 bg-yellow-100 rounded text-sm mb-2 text-yellow-800">
+                No description set for this field. Please add a description in Airtable or use manual criteria.
+              </div>
+            ) : null}
+          </div>
           <Input
             value={criteria}
             onChange={(event) => {
@@ -1603,6 +1638,7 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
                 criteria: event.target.value || undefined,
               });
             }}
+            disabled={useFieldDescription}
           />
         </FormFieldWithTooltip>
       </div>

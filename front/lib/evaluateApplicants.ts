@@ -13,6 +13,29 @@ import {
   getRankingKeyword,
 } from './prompts';
 
+/**
+ * Helper function to resolve criteria for an evaluation field
+ * If useFieldDescription is true, uses the field's description from Airtable
+ * Falls back to manual criteria if description is empty or unavailable
+ */
+const resolveCriteria = (
+  evaluationField: Preset['evaluationFields'][number],
+  evaluationTable: Table
+): string => {
+  if (evaluationField.useFieldDescription) {
+    const field = evaluationTable.getFieldByIdIfExists(evaluationField.fieldId);
+    const description = field?.description;
+    if (description?.trim()) {
+      Logger.debug(`Using field description as criteria for field ${evaluationField.fieldId}`);
+      return description;
+    }
+    Logger.warn(
+      `Field ${evaluationField.fieldId} has useFieldDescription=true but no description found, falling back to manual criteria`
+    );
+  }
+  return evaluationField.criteria;
+};
+
 export type SetProgress = (updater: (prev: number) => number) => void;
 
 /**
@@ -462,13 +485,17 @@ export const evaluateApplicants = (
       
       // Create a result object for Airtable
       const result: Record<string, unknown> = {};
-      
+
       // Evaluate each field
-      const fieldPromises = preset.evaluationFields.map(async ({ fieldId, criteria }) => {
+      const fieldPromises = preset.evaluationFields.map(async (evaluationField) => {
         try {
+          const { fieldId } = evaluationField;
           const fieldName = fieldId; // Simplified for compatibility
           const applicantId = getApplicantIdentifier(plainRecord);
-          
+
+          // Resolve criteria from field description if enabled, otherwise use manual criteria
+          const criteria = resolveCriteria(evaluationField, evaluationTable);
+
       const evalResult = await evaluateItem(
             stringifyApplicantForLLM(plainRecord),
             criteria,
@@ -734,7 +761,8 @@ const evaluateApplicant = async (
   }
 
   const itemResults = await Promise.all(
-    preset.evaluationFields.map(async ({ fieldId, criteria }) => {
+    preset.evaluationFields.map(async (evaluationField) => {
+      const { fieldId } = evaluationField;
       // Fast path: check if this field should be skipped based on the pre-computed skipFields
       if (skipFields.has(fieldId)) {
         // Record it as skipped for logging purposes
@@ -759,6 +787,9 @@ const evaluateApplicant = async (
       // Enhanced logging for API calls
       const fieldStartTime = Date.now();
       Logger.debug(`🔄 Starting evaluation: ${fieldName} for ${applicantId}`);
+
+      // Resolve criteria from field description if enabled, otherwise use manual criteria
+      const criteria = resolveCriteria(evaluationField, evaluationTable);
 
       // Use consistent retry pattern
       const { ranking, transcript } = await pRetry(

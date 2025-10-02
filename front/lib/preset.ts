@@ -12,6 +12,7 @@ export type Preset = {
   evaluationFields: {
     fieldId: string;
     criteria: string;
+    useFieldDescription?: boolean; // Whether to use the field's description as criteria instead of manual entry
     dependsOnInputField?: string; // Optional field ID from the applicant fields that must be non-empty
   }[];
   evaluationApplicantField: string;
