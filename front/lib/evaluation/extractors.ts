@@ -133,6 +133,58 @@ export function extractPdfResumeData(result: string): string | null {
 }
 
 /**
+ * Extract evaluation notes from evaluation result
+ */
+export function extractEvaluationNotes(result: string): string | null {
+  Logger.debug("📝 Attempting to extract evaluation notes from string of length:", result.length);
+
+  // Try different pattern variations that might appear in the text
+  let patterns = [
+    /\[EVALUATION_NOTES\]([\s\S]*?)\[END_EVALUATION_NOTES\]/,
+    /\[EVALUATION_NOTES\]\s*([\s\S]*?)\s*\[END_EVALUATION_NOTES\]/,
+    /\[EVALUATION_NOTES\]\n([\s\S]*?)\n\[END_EVALUATION_NOTES\]/,
+    /\[EVALUATION_NOTES\][\r\n]+([\s\S]*?)[\r\n]+\[END_EVALUATION_NOTES\]/
+  ];
+
+  // Try each pattern
+  for (const pattern of patterns) {
+    const match = result.match(pattern);
+    if (match && match[1]) {
+      Logger.debug("📝 Evaluation notes found with pattern:", pattern);
+      Logger.debug("📝 Evaluation notes extracted, length:", match[1].trim().length);
+      return match[1].trim();
+    }
+  }
+
+  // If we got here, no match was found
+  Logger.debug("📝 Evaluation notes not found with any pattern");
+
+  // Log a small excerpt to help debug
+  const excerpt = result.substring(0, 200);
+  Logger.debug("📝 First 200 chars of content:", excerpt);
+
+  // If result contains [EVALUATION_NOTES] but we couldn't extract it, log the position
+  const marker = "[EVALUATION_NOTES]";
+  const endMarker = "[END_EVALUATION_NOTES]";
+  const markerIndex = result.indexOf(marker);
+  const endMarkerIndex = result.indexOf(endMarker);
+
+  if (markerIndex !== -1) {
+    Logger.debug(`📝 Found [EVALUATION_NOTES] at position ${markerIndex}, content around it:`,
+      result.substring(Math.max(0, markerIndex - 20), markerIndex + marker.length + 50));
+
+    if (endMarkerIndex !== -1) {
+      Logger.debug(`📝 Found [END_EVALUATION_NOTES] at position ${endMarkerIndex}`);
+      Logger.debug(`📝 Distance between markers: ${endMarkerIndex - (markerIndex + marker.length)}`);
+    } else {
+      Logger.debug("📝 End marker [END_EVALUATION_NOTES] not found");
+    }
+  }
+
+  return null;
+}
+
+/**
  * Extract multi-axis scores from eval result
  */
 export function extractMultiAxisData(result: string, axisScores?: Array<{name: string, score: number | null}>): string | null {

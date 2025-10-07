@@ -279,6 +279,7 @@ export async function processBatch(
           applicantRecord,
           preset.evaluationApplicantField,
           preset.evaluationLogsField,
+          preset.evaluationFields, // Pass evaluation fields for per-field notes
           preset.linkedinDataField, // Add LinkedIn data field
           preset.pdfResumeDataField, // Add PDF resume data field
           preset.multiAxisDataField, // Add multi-axis data field
@@ -405,6 +406,7 @@ export async function processBatch(
         applicantRecord,
         preset.evaluationApplicantField,
         preset.evaluationLogsField,
+        preset.evaluationFields,
         preset.linkedinDataField,
         preset.pdfResumeDataField,
         preset.multiAxisDataField,
@@ -524,7 +526,8 @@ export const evaluateApplicants = (
             fieldName,
         linkedinUrl,
         pdfResumeUrl,
-        preset.useMultiAxisEvaluation // Pass multi-axis evaluation flag
+        preset.useMultiAxisEvaluation, // Pass multi-axis evaluation flag
+        evaluationField.notesInstructions // Pass notes instructions from evaluation field
       );
           
           result[fieldId] = evalResult.ranking;
@@ -906,7 +909,8 @@ const evaluateApplicant = async (
             fieldName,
             linkedinUrl, // Pass LinkedIn URL to evaluateItem
             pdfResumeUrl, // Pass PDF resume URL to evaluateItem
-            preset.useMultiAxisEvaluation // Pass multi-axis flag to evaluateItem
+            preset.useMultiAxisEvaluation, // Pass multi-axis flag to evaluateItem
+            evaluationField.notesInstructions // Pass notes instructions from evaluation field
           );
 
           const apiCallTime = Date.now() - apiCallStartTime;
@@ -1043,7 +1047,8 @@ const evaluateItem = async (
   fieldName?: string, // Optional human-readable field name
   linkedinUrl?: string, // Optional LinkedIn URL for enrichment
   pdfResumeUrl?: string, // Optional PDF resume URL for enrichment
-  useMultiAxis?: boolean // Optional flag for multi-axis evaluation
+  useMultiAxis?: boolean, // Optional flag for multi-axis evaluation
+  notesInstructions?: string // Optional custom instructions for evaluation notes
 ): Promise<{
   transcript: string;
   ranking: number;
@@ -1141,6 +1146,7 @@ const evaluateItem = async (
       criteriaString: processedCriteriaString,
       rankingKeyword: settings.rankingKeyword,
       additionalInstructions: settings.additionalInstructions,
+      notesInstructions: notesInstructions,
     },
   };
 
@@ -1171,8 +1177,8 @@ const evaluateItem = async (
   } catch (error) {
     // Always log the full LLM response when the ranking extraction fails
     Logger.error(`Error extracting ranking: ${error.message}`);
-    Logger.error(`Full response: ${completion.substring(0, 200)}...`);
-    
+    Logger.error(`Full response (${completion.length} chars):`, completion);
+
     // Re-throw the error so it can be handled by the retry mechanism
     throw error;
   }

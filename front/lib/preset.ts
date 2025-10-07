@@ -14,10 +14,12 @@ export type Preset = {
     criteria: string;
     useFieldDescription?: boolean; // Whether to use the field's description as criteria instead of manual entry
     dependsOnInputField?: string; // Optional field ID from the applicant fields that must be non-empty
+    notesFieldId?: string; // Optional field ID to store evaluation notes for this criterion
+    notesInstructions?: string; // Optional custom instructions for what to include in notes for this criterion
   }[];
   evaluationApplicantField: string;
   evaluationLogsField?: string;
-  
+
   // LinkedIn enrichment options
   useLinkedinEnrichment?: boolean; // Whether to use LinkedIn enrichment
   linkedinUrlField?: string; // Field ID containing LinkedIn URLs
@@ -57,7 +59,7 @@ export const defaultPreset: Preset = {
   evaluationFields: [],
   evaluationApplicantField: 'fldAVaTU0Btgt1i3p',
   evaluationLogsField: undefined,
-  
+
   // LinkedIn enrichment options (disabled by default)
   useLinkedinEnrichment: false,
   linkedinUrlField: undefined,

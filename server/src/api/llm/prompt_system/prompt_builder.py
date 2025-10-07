@@ -39,10 +39,24 @@ def build_prompt(applicant_data: str, config: PromptConfig) -> List[Message]:
     system_message = template.system_message.replace(
         "{criteria_string}", variables.criteria_string
     ).replace(
-        "{ranking_keyword}", 
+        "{ranking_keyword}",
         variables.ranking_keyword or template.ranking_keyword
     )
-    
+
+    # Add notes instructions if provided
+    if variables.notes_instructions and variables.notes_instructions.strip():
+        ranking_kw = variables.ranking_keyword or template.ranking_keyword
+        notes_section = f"""
+
+   Then, provide structured evaluation notes between [EVALUATION_NOTES] and [END_EVALUATION_NOTES] markers summarizing:
+   {variables.notes_instructions.strip()}
+
+   NOTE: These notes are ADDITIONAL analysis. You still MUST end with the {ranking_kw} line."""
+        system_message = system_message.replace("{notes_instructions}", notes_section)
+    else:
+        # Remove notes section entirely if not provided
+        system_message = system_message.replace("{notes_instructions}", "")
+
     # Add additional instructions if provided
     if variables.additional_instructions and variables.additional_instructions.strip():
         system_message = system_message.replace(

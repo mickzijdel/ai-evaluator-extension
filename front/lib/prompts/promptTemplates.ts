@@ -14,6 +14,7 @@ export interface PromptVariables {
   criteriaString: string;
   rankingKeyword?: string;
   additionalInstructions?: string;
+  notesInstructions?: string;
 }
 
 // SPAR Single-Axis Template - derived from SPAR first axis (General Promise)
@@ -26,13 +27,25 @@ export const SPAR_SINGLE_AXIS_TEMPLATE: PromptTemplate = {
 
 You should ignore general statements or facts about the world, and focus on what the applicant themselves has achieved. You do not need to structure your assessment similar to the answers the user has given.
 
-IMPORTANT RATING CONSTRAINTS:
+=== MANDATORY OUTPUT FORMAT ===
+Your response MUST end with this EXACT format on the last line:
+{rankingKeyword} = [integer from 1-5]
+
+This is REQUIRED. Do not add any text after this line.
+================================
+
+RATING CONSTRAINTS:
 - Your rating MUST be an integer (whole number only)
 - Your rating MUST be between 1 and 5 (inclusive)
 - DO NOT use ratings above 5 or below 1
 - If the rubric mentions different scale values, convert them to the 1-5 scale
 
-First explain your reasoning thinking step by step. Then output your final answer by stating '{rankingKeyword} = ' and then the relevant integer between 1 and 5.{additionalInstructions}`,
+Now, provide your evaluation:
+
+1. First explain your reasoning thinking step by step.{notesInstructions}
+
+2. MANDATORY FINAL LINE: End with exactly: {rankingKeyword} = [your integer score from 1-5]
+   (Do not add anything after this line){additionalInstructions}`,
   rankingKeyword: 'FINAL_RANKING',
   additionalInstructions: '',
 };

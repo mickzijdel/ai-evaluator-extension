@@ -126,6 +126,7 @@ export const retryFailedApplicants = async (
             record,
             preset.evaluationApplicantField,
             preset.evaluationLogsField,
+            preset.evaluationFields,
             preset.linkedinDataField,
             preset.pdfResumeDataField,
             preset.multiAxisDataField,

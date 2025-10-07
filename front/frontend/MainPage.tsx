@@ -1640,6 +1640,8 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
     criteria: '',
     useFieldDescription: false,
     dependsOnInputField: undefined,
+    notesFieldId: undefined,
+    notesInstructions: undefined,
   };
   const isExistingField = index < preset.evaluationFields.length;
   const showGuidedHelp = useGuidedMode();
@@ -1660,6 +1662,14 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
     evaluationField.dependsOnInputField
       ? applicantTable?.getFieldByIdIfExists(evaluationField.dependsOnInputField)
       : null
+  );
+  const [notesField, setNotesField] = useState<Field | null>(
+    evaluationField.notesFieldId
+      ? evaluationTable?.getFieldByIdIfExists(evaluationField.notesFieldId)
+      : null
+  );
+  const [notesInstructions, setNotesInstructions] = useState<string>(
+    evaluationField.notesInstructions ?? ''
   );
 
   // Create options for the dependency dropdown from the applicant fields
@@ -1804,6 +1814,60 @@ const EvaluationFieldEditor: React.FC<FieldEditorProps> = ({ preset, index }) =>
           }}
         />
       </FormFieldWithTooltip>
+
+      {/* Notes configuration */}
+      <FormFieldWithTooltip
+        label="(optional) Notes instructions"
+        helpKey="notesInstructions"
+        showGuidedHelp={showGuidedHelp}
+        className="mb-0 mt-3"
+      >
+        <Input
+          value={notesInstructions}
+          onChange={(e) => {
+            setNotesInstructions(e.target.value);
+            saveField({
+              ...evaluationField,
+              notesInstructions: e.target.value,
+            });
+          }}
+          placeholder="- Key strengths relevant to the criteria&#10;- Key weaknesses or gaps&#10;- Specific evidence from the application"
+        />
+        <div className="mt-1 text-xs text-gray-500">
+          Tell the AI what to focus on in its analysis. The structured notes will appear in the logs.
+          {evaluationField.notesFieldId ? (
+            <span className="text-green-600"> Notes will also be extracted to the field below.</span>
+          ) : (
+            <span> To extract notes to a separate field, select a notes field below.</span>
+          )}
+        </div>
+      </FormFieldWithTooltip>
+
+      <FormFieldWithTooltip
+        label="(optional) Notes field"
+        helpKey="notesField"
+        showGuidedHelp={showGuidedHelp}
+        className="mb-0 mt-3"
+      >
+        <FieldPicker
+          allowedTypes={[
+            FieldType.SINGLE_LINE_TEXT,
+            FieldType.MULTILINE_TEXT,
+            FieldType.RICH_TEXT,
+          ]}
+          table={evaluationTable}
+          shouldAllowPickingNone={true}
+          onChange={(field) => {
+            setNotesField(field);
+            saveField({ ...evaluationField, notesFieldId: field?.id });
+          }}
+          field={notesField}
+        />
+        <div className="mt-1 text-xs text-gray-500">
+          Optional: Select a field to extract structured notes from the AI's response. If not selected, notes will only appear in logs.
+        </div>
+      </FormFieldWithTooltip>
+
       {isExistingField && (
         <div className="mt-3 flex justify-end">
           <Button

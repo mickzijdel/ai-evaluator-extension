@@ -19,10 +19,11 @@ class PromptTemplate(BaseModel):
 
 class PromptVariables(BaseModel):
     """Variables that can be substituted in prompt templates."""
-    
+
     criteria_string: str
     ranking_keyword: Optional[str] = None
     additional_instructions: Optional[str] = None
+    notes_instructions: Optional[str] = None
 
 
 # Default template - extracted from existing proven prompt
@@ -34,13 +35,25 @@ ACADEMIC_TEMPLATE = PromptTemplate(
 
 You should ignore general statements or facts about the world, and focus on what the applicant themselves has achieved. You do not need to structure your assessment similar to the answers the user has given.
 
-IMPORTANT RATING CONSTRAINTS:
+=== MANDATORY OUTPUT FORMAT ===
+Your response MUST end with this EXACT format on the last line:
+{ranking_keyword} = [integer from 1-5]
+
+This is REQUIRED. Do not add any text after this line.
+================================
+
+RATING CONSTRAINTS:
 - Your rating MUST be an integer (whole number only)
 - Your rating MUST be between 1 and 5 (inclusive)
 - DO NOT use ratings above 5 or below 1
 - If the rubric mentions different scale values, convert them to the 1-5 scale
 
-First explain your reasoning thinking step by step. Then output your final answer by stating '{ranking_keyword} = ' and then the relevant integer between 1 and 5.{additional_instructions}""",
+Now, provide your evaluation:
+
+1. First explain your reasoning thinking step by step.{notes_instructions}
+
+2. MANDATORY FINAL LINE: End with exactly: {ranking_keyword} = [your integer score from 1-5]
+   (Do not add anything after this line){additional_instructions}""",
     ranking_keyword="FINAL_RANKING"
 )
 

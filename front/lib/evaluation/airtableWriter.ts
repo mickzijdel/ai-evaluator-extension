@@ -2,7 +2,7 @@ import type { Record as AirtableRecord, Table, Field } from '@airtable/blocks/mo
 import { FieldType } from '@airtable/blocks/models';
 import type { ModelProvider } from '../models/config';
 import { Logger } from '../logger';
-import { extractLinkedinData, extractEnrichmentLogs, extractPdfResumeData, extractMultiAxisData } from './extractors';
+import { extractLinkedinData, extractEnrichmentLogs, extractPdfResumeData, extractMultiAxisData, extractEvaluationNotes } from './extractors';
 import { formatProviderModel } from './providerModelFormatter';
 
 /**
@@ -61,6 +61,7 @@ export async function createEvaluationRecords(
   applicantRecord: AirtableRecord,
   applicantFieldId: string,
   logsFieldId: string | undefined,
+  evaluationFields: Array<{fieldId: string, notesFieldId?: string}>,
   linkedinDataFieldId: string | undefined,
   pdfResumeDataFieldId: string | undefined,
   multiAxisDataFieldId: string | undefined,
@@ -97,6 +98,7 @@ export async function createEvaluationRecords(
   // Log all the field IDs to debug what's being passed
   Logger.info("🔍 Field IDs received in createEvaluationRecords:", {
     logsFieldId,
+    evaluationFieldsCount: evaluationFields.length,
     linkedinDataFieldId,
     pdfResumeDataFieldId,
     multiAxisDataFieldId,
@@ -130,6 +132,45 @@ export async function createEvaluationRecords(
       .join('\n\n---\n\n');
 
     recordData[logsFieldId] = combinedLogsFull;
+  }
+
+  // Extract and add evaluation notes for each field that has a notes field configured
+  for (const evalField of evaluationFields) {
+    if (evalField.notesFieldId) {
+      Logger.info("📝 Processing notes for field:", {
+        scoreFieldId: evalField.fieldId,
+        notesFieldId: evalField.notesFieldId
+      });
+
+      // Get the log for this specific evaluation field
+      const fieldLog = logsByField[evalField.fieldId];
+
+      if (fieldLog) {
+        Logger.debug("📝 Checking field log for evaluation notes, log length:", fieldLog.length);
+
+        // Check if the log contains evaluation notes markers
+        if (fieldLog.includes("[EVALUATION_NOTES]")) {
+          Logger.info("📝 Found [EVALUATION_NOTES] marker in field log!");
+        }
+
+        // Extract evaluation notes from this field's log
+        const evaluationNotes = extractEvaluationNotes(fieldLog);
+        if (evaluationNotes) {
+          Logger.info("📝 Evaluation notes extracted successfully for field!", {
+            scoreFieldId: evalField.fieldId,
+            notesFieldId: evalField.notesFieldId,
+            dataLength: evaluationNotes.length,
+            first100Chars: evaluationNotes.substring(0, 100)
+          });
+          recordData[evalField.notesFieldId] = evaluationNotes;
+          Logger.debug('📝 Evaluation notes extracted and stored in field-specific notes field');
+        } else {
+          Logger.warn("⚠️ No evaluation notes found in log for field:", evalField.fieldId);
+        }
+      } else {
+        Logger.warn("⚠️ No log found for field:", evalField.fieldId);
+      }
+    }
   }
 
   // Extract and add LinkedIn data if a LinkedIn data field is specified
